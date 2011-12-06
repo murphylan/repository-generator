@@ -2,6 +2,7 @@ package org.sonatype.spice.generator;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,10 +13,11 @@ import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
+// 100MB per ~12500 artifacts
 public class RepositoryGeneratorMain
 {
     private static final String LINE_ENDING = System.getProperty( "line.separator" );
-    
+
     private static Properties props = null;
 
     private static final String DEFAULT_GROUP_IDS = "group1,group2,group3";
@@ -23,6 +25,8 @@ public class RepositoryGeneratorMain
     private static final String DEFAULT_ARTIFACT_IDS = "artifact1,artifact2,artifact3";
 
     private static final String DEFAULT_VERSIONS = "UNDEFINED";
+
+    private static final String DEFAULT_VERSION_SNAPSHOTS = "false";
 
     private static final String DEFAULT_GROUP_IDS_UNDEFINED_COUNT = "10";
 
@@ -38,13 +42,15 @@ public class RepositoryGeneratorMain
 
     private static final String KEY_ARTIFACT_IDS = "artifact-id-values";
 
-    private static final String KEY_VERSIONS = "version-values";
+    private static final String KEY_VERSION = "version-values";
+
+    private static final String KEY_VERSION_SNAPSHOTS = "version-snapshots";
 
     private static final String KEY_GROUP_IDS_UNDEFINED_COUNT = "group-id-undefined-count";
 
     private static final String KEY_ARTIFACT_IDS_UNDEFINED_COUNT = "artifact-id-undefined-count";
 
-    private static final String KEY_VERSIONS_UNDEFINED_COUNT = "version-undefined-count";
+    private static final String KEY_VERSION_UNDEFINED_COUNT = "version-undefined-count";
 
     private static final String KEY_APPEND_OUTPUT = "append-output";
 
@@ -61,20 +67,38 @@ public class RepositoryGeneratorMain
 
     private static final String POST_POM = "</project>" + LINE_ENDING;
 
+    private static final boolean isUndefined(final String test) {
+        return "UNDEFINED".equals(test);
+    }
+
     public static void main( String[] args )
         throws Exception
     {
+        // properties file
+        if(args != null && args.length > 0)
+        {
+            String fileName = args[0];
+            if(fileName != null){
+                props = new Properties();
+                props.load(new FileInputStream(fileName));
+            }
+        }
+
         // now lets get our set of groupIds, artifactIds and versions
-        Set<String> groupIds =
-            stringToSet( getPropertyValue( KEY_GROUP_IDS, DEFAULT_GROUP_IDS ),
+        final String groupValues = getPropertyValue( KEY_GROUP_IDS, DEFAULT_GROUP_IDS );
+        final Set<String> groupIds = stringToSet( (isUndefined(groupValues) ? "g" : null), groupValues, null,
                 Integer.parseInt( getPropertyValue( KEY_GROUP_IDS_UNDEFINED_COUNT, DEFAULT_GROUP_IDS_UNDEFINED_COUNT ) ) );
-        Set<String> artifactIds =
-            stringToSet( getPropertyValue( KEY_ARTIFACT_IDS, DEFAULT_ARTIFACT_IDS ),
+
+        final String artifactValues = getPropertyValue( KEY_ARTIFACT_IDS, DEFAULT_ARTIFACT_IDS );
+        final Set<String> artifactIds =
+            stringToSet( (isUndefined(artifactValues) ? "a" : null), artifactValues , null,
                 Integer.parseInt( getPropertyValue( KEY_ARTIFACT_IDS_UNDEFINED_COUNT,
                     DEFAULT_ARTIFACT_IDS_UNDEFINED_COUNT ) ) );
+
+        final boolean snapshots = Boolean.parseBoolean( getPropertyValue( KEY_VERSION_SNAPSHOTS, DEFAULT_VERSION_SNAPSHOTS ));
         Set<String> versions =
-            stringToSet( getPropertyValue( KEY_VERSIONS, DEFAULT_VERSIONS ),
-                Integer.parseInt( getPropertyValue( KEY_VERSIONS_UNDEFINED_COUNT, DEFAULT_VERSION_UNDEFINED_COUNT ) ) );
+            stringToSet(null, getPropertyValue( KEY_VERSION, DEFAULT_VERSIONS ), (snapshots ? "-SNAPSHOT" : "") ,
+                Integer.parseInt( getPropertyValue( KEY_VERSION_UNDEFINED_COUNT, DEFAULT_VERSION_UNDEFINED_COUNT ) ) );
 
         // now lets combine all these values into single list of items to create
         Set<String> gavs = getGAVStrings( groupIds, artifactIds, versions );
@@ -104,16 +128,16 @@ public class RepositoryGeneratorMain
         return props.getProperty( key, defaultValue );
     }
 
-    private static Set<String> stringToSet( String values, int undefinedCount )
+    private static Set<String> stringToSet( final String valuePrefix, final String values, final String valueSuffix, final int undefinedCount )
     {
         Set<String> valuesSet = new HashSet<String>();
 
-        if ( "UNDEFINED".equals( values ) )
+        if ( isUndefined(values) )
         {
             // if undefined, we'll add XX items
             for ( int i = 0; i < undefinedCount; i++ )
             {
-                valuesSet.add( Integer.toString( i ) );
+                valuesSet.add( (valuePrefix != null ? valuePrefix : "") + Integer.toString( i ) + (valueSuffix != null ? valueSuffix : ""));
             }
         }
         else
@@ -122,12 +146,13 @@ public class RepositoryGeneratorMain
 
             for ( int i = 0; i < valuesArray.length; i++ )
             {
-                valuesSet.add( valuesArray[i] );
+                valuesSet.add( (valuePrefix != null ? valuePrefix : "") + valuesArray[i] + (valueSuffix != null ? valueSuffix : ""));
             }
         }
 
         return valuesSet;
     }
+
 
     private static Set<String> getGAVStrings( Set<String> groupIds, Set<String> artifactIds, Set<String> versions )
     {
