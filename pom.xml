@@ -10,6 +10,7 @@
   <version>0.0.1-SNAPSHOT</version>
   <properties>
     <maven-jar-plugin.version>2.3.1</maven-jar-plugin.version>
+    <main-class>org.sonatype.spice.generator.RepositoryGeneratorMain</main-class>
   </properties>
   <build>
     <plugins>
@@ -20,11 +21,22 @@
         <configuration>
           <archive>
             <manifest>
-              <mainClass>org.sonatype.spice.generator.RepositoryGeneratorMain</mainClass>
+              <mainClass>${main-class}</mainClass>
             </manifest>
           </archive>
         </configuration>
       </plugin>
+        <plugin>
+           <groupId>org.codehaus.mojo</groupId>
+           <artifactId>exec-maven-plugin</artifactId>
+           <version>1.1.1</version>
+               <configuration>
+                  <mainClass>${main-class}</mainClass>
+                  <arguments>
+                      <arg>src/main/resources/repository-generator.properties</arg>
+                  </arguments>
+             </configuration>
+          </plugin>
     </plugins>
   </build>
 </project>
